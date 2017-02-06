@@ -9,8 +9,6 @@ import numpy
 import random
 import urllib2
 
-from scipy.stats import norm
-
 from bs4 import BeautifulSoup
 
 def rouletteWheel(weights):
@@ -200,5 +198,15 @@ def run_simulation(sim, n_trials=10000):
         
     return {team_name: result for team_name, result in zip(sim.team_names, results)}
 
-sim = SimulationData()
-sim.populate()
+def run():
+    sim = SimulationData()
+    print 'populating sim'
+    sim.populate()
+    print 'starting sim'
+    import datetime
+    start_time = datetime.datetime.now()
+    results = run_simulation(sim, n_trials=100000)
+    end_time = datetime.datetime.now()
+    print 'sim done after ' + str(end_time-start_time)
+    simulataion_data_to_csv(results)
+    print 'done'
