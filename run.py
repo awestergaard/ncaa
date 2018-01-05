@@ -4,12 +4,11 @@ Created on Jan 13, 2017
 @author: Adam
 '''
 
-import cookielib
-import multiprocessing
+from http.cookiejar import CookieJar
+from multiprocessing.pool import Pool
 import numpy
 import random
 import urllib
-import urllib2
 
 team_mod = {}
 
@@ -108,7 +107,7 @@ def ncdf(x):
 
 def simulataion_data_to_csv(data):
     f = open(r'C:\kenpom_prob.csv', 'w')
-    sorted_data = sorted(data.iteritems(),key=lambda x:-x[1])
+    sorted_data = sorted(data.items(),key=lambda x:-x[1])
     for k,v in sorted_data:
         if v > 0:
             f.write(k + ',' + str(v) + '\n')
@@ -116,7 +115,7 @@ def simulataion_data_to_csv(data):
 
 class SimulationData():
     def populate(self):
-        kenpom = urllib2.urlopen('http://kenpom.com/')
+        kenpom = urllib.request.urlopen('http://kenpom.com/')
         kenpom_page = kenpom.read()
         kenpom_soup = BeautifulSoup(kenpom_page, 'html.parser')
         kenpom_table = kenpom_soup.find_all('tr')
@@ -130,24 +129,25 @@ class SimulationData():
                 kenpom_adjo.append(float(items[5].get_text()))
                 kenpom_adjd.append(float(items[7].get_text()))
                 kenpom_adjt.append(float(items[9].get_text()))
-                kenpom_team_name = items[1].get_text().strip().lower()
-                for i in xrange(17):
+                kenpom_team_name = items[1].get_text().strip().lower().strip(';')
+                for i in range(17):
                     kenpom_team_name = kenpom_team_name.strip(' ' + str(i))
                 kenpom_team_names.append(kenpom_team_name)
                 
             except:
                 pass
     
-        cj = cookielib.CookieJar()
-        opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+        cj = CookieJar()
+        opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
 
         authentication_url = 'http://kenpom.com/handlers/login_handler.php'
         authentication_payload = {
             'email': 'a.westergaard@gmail.com',
-            'password': 'XGsUvkAPrRjRw82fDZSvstHG4HYjNoc'
+            'password': 'ey6qRMvgcj'
         }
-        authentication_data = urllib.urlencode(authentication_payload)
-        opener.open(authentication_url, authentication_data)
+        authentication_data = urllib.parse.urlencode(authentication_payload)
+        authentication_binary_data = authentication_data.encode('UTF-8')
+        opener.open(authentication_url, authentication_binary_data)
 
         kenpom_stats = opener.open('http://kenpom.com/stats.php')
         kenpom_stats_page = kenpom_stats.read()
@@ -213,7 +213,7 @@ class SimulationData():
             except:
                 pass
 
-        bracketmatrix = urllib2.urlopen('http://bracketmatrix.com/')
+        bracketmatrix = urllib.request.urlopen('http://bracketmatrix.com/')
         bracketmatrix_page = bracketmatrix.read()
         bracketmatrix_soup = BeautifulSoup(bracketmatrix_page, 'html.parser')
         bracketmatrix_table = bracketmatrix_soup.find_all('tr')
@@ -243,6 +243,7 @@ class SimulationData():
                 average_seed = float(items[3].get_text())
                 num_brackets = int(items[4].get_text())
                 team_name = items[1].get_text().strip().lower()
+                #print(team_name)
                 potential_kenpom_aliases = self.get_potential_kenpom_aliases(team_name)
                 loc = -1
                 for alias in potential_kenpom_aliases:
@@ -250,9 +251,9 @@ class SimulationData():
                         loc = kenpom_team_names.index(alias)
                         break
                 
-                if loc <> -1:
+                if loc != -1:
                     if team_name in team_mod:
-                        print 'modifying ' + team_name
+                        print('modifying ' + team_name)
                         kenpom_adjo[loc] += team_mod[team_name]
                         kenpom_adjd[loc] -= team_mod[team_name]
                         
@@ -318,23 +319,23 @@ def simulate_tournament_round(seeding, data):
     round_adjd = [data['adjd'][i] for i in seeding]
     round_adjt = [data['adjt'][i] for i in seeding]
     n_teams = len(round_adjo)
-    n_games = n_teams / 2
-    tempos = [round_adjt[i] + round_adjt[n_teams-1-i] - data['averaget'] for i in xrange(n_games)]
-    scoring_prob = [(round_adjo[i] + round_adjd[n_teams-1-i] - data['averageo'])/200. for i in xrange(n_teams)]
+    n_games = int(n_teams / 2)
+    tempos = [round_adjt[i] + round_adjt[n_teams-1-i] - data['averaget'] for i in range(n_games)]
+    scoring_prob = [(round_adjo[i] + round_adjd[n_teams-1-i] - data['averageo'])/200. for i in range(n_teams)]
     win_probability = [ncdf(numpy.sqrt(tempos[i]) *
                             (scoring_prob[i] - scoring_prob[n_teams-1-i]) /
                              numpy.sqrt(scoring_prob[i]*(1-scoring_prob[i]) +
                                         scoring_prob[n_teams-1-i]*(1-scoring_prob[n_teams-1-i])))
-                       for i in xrange(n_games)]
-    outcomes = [random.random() for _ in xrange(n_games)]
-    return [seeding[i] if outcomes[i] < win_probability[i] else seeding[n_teams-1-i] for i in xrange(n_games)]
+                       for i in range(n_games)]
+    outcomes = [random.random() for _ in range(n_games)]
+    return [seeding[i] if outcomes[i] < win_probability[i] else seeding[n_teams-1-i] for i in range(n_games)]
 
 def pick_seeds(data):
     average_seeds = data['average_seeds'][:]
     percent_of_brackets = [num_brackets / float(data['max_brackets']) for num_brackets in data['num_brackets']]
     locations = range(len(average_seeds))
     seeding = [0]*64
-    for i in xrange(64):
+    for i in range(64):
         target_seed = i/4+1
         weights = [numpy.exp(-x*x/n)
                 + numpy.exp(-(x-target_seed)*(x-target_seed))*n for x, n in zip(average_seeds, percent_of_brackets)]
@@ -347,22 +348,22 @@ def pick_seeds(data):
 
 def pick_seeds2(data):
     seeding = []
-    for i in xrange(10):
-        seeding += random.sample(xrange(4*i, 4*(i+1)),4)
+    for i in range(10):
+        seeding += random.sample(range(4*i, 4*(i+1)),4)
         
-    seeding += random.sample(xrange(41,53),8)
+    seeding += random.sample(range(41,53),8)
     
-    for i in xrange(13,16):
-        seeding += random.sample(xrange(4*i, 4*(i+1)),4)
+    for i in range(13,16):
+        seeding += random.sample(range(4*i, 4*(i+1)),4)
         
-    seeding += random.sample(xrange(64,72),4)
+    seeding += random.sample(range(64,72),4)
     
     return seeding
 
 def pick_seeds3(data):
     seeding = [None]*35
-    up = range(5)
-    for i in xrange(35):
+    up = list(range(5))
+    for i in range(35):
         if i-2 in up:
             seeding[i] = i-2
             del up[up.index(i-2)]
@@ -372,16 +373,16 @@ def pick_seeds3(data):
             del up[0]
         up.append(i+5)
     seeding[35:40] += up
-    seeding[41:49] += random.sample(xrange(41,53),8)
-    for i in xrange(13,16):
-        seeding += random.sample(xrange(4*i, 4*(i+1)),4)
-    seeding += random.sample(xrange(64,72),4)
+    seeding[41:49] += random.sample(range(41,53),8)
+    for i in range(13,16):
+        seeding += random.sample(range(4*i, 4*(i+1)),4)
+    seeding += random.sample(range(64,72),4)
     
     return seeding
 
 def pick_seed_final(data):
     seeding = [None]*64
-    for i in xrange(64):
+    for i in range(64):
         if len(bracket[i]) == 2:
             choice = random.choice(bracket[i])
             seeding[i] = data['team_names'].index(choice)
@@ -393,7 +394,8 @@ def pick_seed_final(data):
 def simulate_tournament(data):
     #seeding = pick_seeds(data)
     #seeding = pick_seeds2(data)
-    seeding = pick_seed_final(data)
+    seeding = pick_seeds3(data)
+    #seeding = pick_seed_final(data)
             
     while len(seeding) > 1:
         seeding = simulate_tournament_round(seeding, data)
@@ -412,17 +414,17 @@ def get_raw_data_from_sim(sim):
             'max_brackets': sim.max_brackets}
 
 def run_simulation(sim, n_trials=10000):
-    pool = multiprocessing.Pool()
+    sim_pool = Pool()
     data = get_raw_data_from_sim(sim)
-    winners = pool.map(simulate_tournament, (data for _ in xrange(n_trials)))
+    winners = sim_pool.map(simulate_tournament, (data for _ in range(n_trials)))
     results = [0]*len(sim.team_names)
-    for team in xrange(len(sim.team_names)):
+    for team in range(len(sim.team_names)):
         results[team] = float(winners.count(team)) / n_trials
         
     return {team_name: result for team_name, result in zip(sim.team_names, results)}
 
 def simulate_picks(sim, n_trials=10000):
-    pool = multiprocessing.Pool()
+    sim_pool = Pool()
     data = {'average_seeds': sim.average_seeds,
             'num_brackets': sim.num_brackets,
             'adjo': sim.adjo,
@@ -431,10 +433,10 @@ def simulate_picks(sim, n_trials=10000):
             'averageo': sim.averageo,
             'averaget': sim.averaget,
             'max_brackets': sim.max_brackets}
-    seedings = pool.map(pick_seeds, (data for _ in xrange(n_trials)))
+    seedings = sim_pool.map(pick_seeds, (data for _ in range(n_trials)))
     results = [(-1.,0.)]*len(sim.team_names)
-    for team in xrange(len(sim.team_names)):
-        team_seeds = [seedings[i].index(team) for i in xrange(n_trials) if team in seedings[i]]
+    for team in range(len(sim.team_names)):
+        team_seeds = [seedings[i].index(team) for i in range(n_trials) if team in seedings[i]]
         if len(team_seeds):
             results[team] = (numpy.min(team_seeds)/4+1, 
                              numpy.average(team_seeds)/4.+1., 
@@ -445,13 +447,13 @@ def simulate_picks(sim, n_trials=10000):
 
 def run():
     sim = SimulationData()
-    print 'populating sim'
+    print('populating sim')
     sim.populate()
-    print 'starting sim'
+    print('starting sim')
     import datetime
     start_time = datetime.datetime.now()
     results = run_simulation(sim, n_trials=100000)
     end_time = datetime.datetime.now()
-    print 'sim done after ' + str(end_time-start_time)
+    print('sim done after ' + str(end_time-start_time))
     simulataion_data_to_csv(results)
-    print 'done'
+    print('done')

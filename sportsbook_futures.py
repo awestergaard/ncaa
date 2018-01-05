@@ -16,10 +16,11 @@ def obj_fun(x, raw_prob):
     mod_prob = better_prod(x, raw_prob)
     return 1.-mod_prob.sum()
 
-sportsbook = urllib2.urlopen(r'https://www.sportsbook.ag/sbk/sportsbook4/golf-the-masters-betting/the-masters-live-odds.sbk')
+sportsbook = urllib2.urlopen(r'https://www.sportsbook.ag/sbk/sportsbook4/ncaa-basketball-betting/2018-ncaa-championship.sbk')
 sportsbook_page = sportsbook.read()
 sportsbook_soup = BeautifulSoup(sportsbook_page, 'html.parser')
 items = sportsbook_soup.find_all('div', {'class' : 'clearfix row eventrow'})
+print len(items)
 names = [None]*len(items)
 markets = numpy.array([0.]*len(items))
 for i,item in enumerate(items):
